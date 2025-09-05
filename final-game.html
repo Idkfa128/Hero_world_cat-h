@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Word Catch - Финальная версия</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #00ffaa;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .game-container {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ffaa;
+            border-radius: 10px;
+            padding: 20px;
+            max-width: 900px;
+            width: 90%;
+        }
+
+        .title {
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px #00ffaa;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #7dfaa7;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .hud {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+        }
+
+        .question {
+            background: rgba(0, 255, 170, 0.1);
+            border: 1px solid #00ffaa;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+
+        .game-area {
+            background: #071012;
+            border: 2px solid #00ffaa;
+            height: 400px;
+            position: relative;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .word {
+            position: absolute;
+            color: #7dfaa7;
+            font-size: 16px;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.3s ease;
+            padding: 5px;
+            border-radius: 3px;
+        }
+
+        .word:hover {
+            color: #00ffaa;
+            text-shadow: 0 0 5px #00ffaa;
+            background: rgba(0, 255, 170, 0.1);
+        }
+
+        .word.collected {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .word.dragging {
+            z-index: 1000;
+            transform: scale(1.1);
+        }
+
+        .drop-zone {
+            background: rgba(0, 255, 170, 0.2);
+            border: 2px dashed #00ffaa;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .drop-zone.drag-over {
+            background: rgba(0, 255, 170, 0.4);
+            border-color: #7dfaa7;
+        }
+
+        .controls {
+            text-align: center;
+        }
+
+        .btn {
+            background: #00ffaa;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1.1em;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 10px;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            background: #7dfaa7;
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .difficulty-selector {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .difficulty-selector select {
+            background: #000;
+            color: #00ffaa;
+            border: 1px solid #00ffaa;
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+
+        .authors {
+            text-align: center;
+            color: #7dfaa7;
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+
+        .game-over {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .final-score {
+            font-size: 2em;
+            color: #00ffaa;
+            margin: 20px 0;
+        }
+
+        .prompt {
+            color: #7dfaa7;
+            margin: 20px 0;
+            font-style: italic;
+        }
+
+        .loading {
+            text-align: center;
+            color: #7dfaa7;
+            font-size: 1.2em;
+        }
+
+        .error {
+            color: #ff6b6b;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div id="menu" class="screen">
+            <h1 class="title">WORD CATCH</h1>
+            <p class="subtitle">данная игра — метод расслабления. играйте в удовольствие.</p>
+            
+            <div class="difficulty-selector">
+                <label>Сложность: 
+                    <select id="difficulty">
+                        <option value="easy">Лёгкая</option>
+                        <option value="medium" selected>Средняя</option>
+                        <option value="hard">Сложная</option>
+                    </select>
+                </label>
+            </div>
+            
+            <div class="controls">
+                <button id="startBtn" class="btn">Начать игру</button>
+            </div>
+            
+            <div class="authors">Авторы: команда np hero</div>
+        </div>
+
+        <div id="game" class="screen" style="display: none;">
+            <div class="hud">
+                <div>Очки: <span id="score">0</span></div>
+                <div>Жизни: <span id="lives">3</span></div>
+                <div>Время: <span id="timer">60</span>с</div>
+            </div>
+            
+            <div class="question">
+                Вопрос: <span id="questionText">Загрузка...</span>
+            </div>
+            
+            <div class="game-area" id="gameArea">
+                <!-- Слова будут добавлены динамически -->
+            </div>
+            
+            <div class="drop-zone" id="dropZone">
+                <span>Перетащите сюда собранные слова</span>
+            </div>
+            
+            <div class="controls">
+                <button id="checkBtn" class="btn">Проверить ответ</button>
+                <button id="menuBtn" class="btn">В меню</button>
+            </div>
+        </div>
+
+        <div id="end" class="screen" style="display: none;">
+            <div class="game-over">
+                <h2>Игра завершена!</h2>
+                <div class="final-score">Ваш результат: <span id="finalScore">0</span></div>
+                <div class="prompt">Совет: <span id="randomPrompt">Сделайте короткий вдох/выдох и продолжите. :)</span></div>
+                <button id="restartBtn" class="btn">Играть снова</button>
+            </div>
+        </div>
+
+        <div id="loading" class="screen" style="display: none;">
+            <div class="loading">
+                <h2>Загрузка данных...</h2>
+                <p>Пожалуйста, подождите</p>
+            </div>
+        </div>
+
+        <div id="error" class="screen" style="display: none;">
+            <div class="error">
+                <h2>Ошибка загрузки</h2>
+                <p>Не удалось загрузить данные игры</p>
+                <button id="retryBtn" class="btn">Попробовать снова</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Класс для загрузки CSV данных
+        class CSVLoader {
+            constructor() {
+                this.reflections = [];
+                this.prompts = [];
+            }
+
+            async loadReflections() {
+                try {
+                    const response = await fetch('reflections.csv');
+                    const text = await response.text();
+                    const lines = text.split('\n');
+                    const headers = lines[0].split(',');
+                    
+                    this.reflections = [];
+                    for (let i = 1; i < lines.length; i++) {
+                        if (lines[i].trim()) {
+                            const values = this.parseCSVLine(lines[i]);
+                            if (values.length >= headers.length) {
+                                const row = {};
+                                headers.forEach((header, index) => {
+                                    row[header.trim()] = values[index] ? values[index].trim() : '';
+                                });
+                                
+                                // Пропускаем записи без разрешения
+                                if (row.privacy_ok && row.privacy_ok.toLowerCase() === 'true') {
+                                    // Извлекаем слова из ответа
+                                    const answerWords = this.extractWords(row.answer_text || '');
+                                    const promptWords = this.extractWords(row.prompt_text || '');
+                                    
+                                    // Объединяем слова
+                                    let requiredWords = [...answerWords];
+                                    if (requiredWords.length < 3) {
+                                        requiredWords = [...requiredWords, ...promptWords.slice(0, 2)];
+                                    }
+                                    
+                                    // Ограничиваем количество слов
+                                    requiredWords = [...new Set(requiredWords)].slice(0, 5);
+                                    
+                                    this.reflections.push({
+                                        reflection_id: row.reflection_id,
+                                        prompt_text: row.prompt_text,
+                                        answer_text: row.answer_text,
+                                        insight_tags: row.insight_tags ? row.insight_tags.split(',').map(t => t.trim()) : [],
+                                        required_words: requiredWords
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    
+                    console.log(`Загружено ${this.reflections.length} записей из reflections.csv`);
+                    return this.reflections;
+                } catch (error) {
+                    console.error('Ошибка загрузки reflections.csv:', error);
+                    return this.getFallbackReflections();
+                }
+            }
+
+            async loadPrompts() {
+                try {
+                    const response = await fetch('prompts.csv');
+                    const text = await response.text();
+                    const lines = text.split('\n');
+                    const headers = lines[0].split(',');
+                    
+                    this.prompts = [];
+                    for (let i = 1; i < lines.length; i++) {
+                        if (lines[i].trim()) {
+                            const values = this.parseCSVLine(lines[i]);
+                            if (values.length >= headers.length) {
+                                const row = {};
+                                headers.forEach((header, index) => {
+                                    row[header.trim()] = values[index] ? values[index].trim() : '';
+                                });
+                                
+                                this.prompts.push({
+                                    prompt_id: row.prompt_id,
+                                    text: row.text,
+                                    category: row.category
+                                });
+                            }
+                        }
+                    }
+                    
+                    console.log(`Загружено ${this.prompts.length} записей из prompts.csv`);
+                    return this.prompts;
+                } catch (error) {
+                    console.error('Ошибка загрузки prompts.csv:', error);
+                    return this.getFallbackPrompts();
+                }
+            }
+
+            parseCSVLine(line) {
+                const result = [];
+                let current = '';
+                let inQuotes = false;
+                
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        result.push(current);
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                
+                result.push(current);
+                return result;
+            }
+
+            extractWords(text) {
+                const words = text.toLowerCase()
+                    .replace(/[^\w\s]/g, ' ')
+                    .split(/\s+/)
+                    .filter(word => word.length > 2);
+                
+                const stopWords = new Set([
+                    'что', 'как', 'где', 'когда', 'почему', 'зачем', 'кто',
+                    'чтобы', 'если', 'то', 'и', 'в', 'на', 'с', 'по', 'о', 'об',
+                    'из', 'от', 'до', 'для', 'у', 'не', 'но', 'а', 'же', 'ли', 'бы',
+                    'вот', 'это', 'тот', 'такой', 'какой', 'весь', 'все', 'всё',
+                    'он', 'она', 'оно', 'они', 'я', 'ты', 'вы', 'мы', 'свой', 'твой',
+                    'ваш', 'наш', 'его', 'её', 'их', 'сегодня', 'завтра', 'потом',
+                    'сейчас', 'очень', 'быстро', 'медленно', 'иногда', 'часто', 'редко'
+                ]);
+                
+                return words.filter(word => !stopWords.has(word));
+            }
+
+            getFallbackReflections() {
+                return [
+                    {
+                        reflection_id: "R0001",
+                        prompt_text: "О чём ты сейчас беспокоишься? Что можно отпустить?",
+                        answer_text: "Почувствовал(а), что короткий перерыв помогает.",
+                        insight_tags: ["фокус"],
+                        required_words: ["короткий", "перерыв", "помогает"]
+                    },
+                    {
+                        reflection_id: "R0002",
+                        prompt_text: "Что получилось хорошо за последние 2–3 часа?",
+                        answer_text: "Замечаю, разговор с коллегой отвлёк.",
+                        insight_tags: ["цели"],
+                        required_words: ["разговор", "коллегой", "отвлёк"]
+                    },
+                    {
+                        reflection_id: "R0003",
+                        prompt_text: "Какая одна маленькая вещь поможет следующему шагу?",
+                        answer_text: "Почувствовал(а), что дыхание выравнивает фокус — попробую завтра снова.",
+                        insight_tags: ["граница-раб-лич"],
+                        required_words: ["дыхание", "выравнивает", "фокус"]
+                    }
+                ];
+            }
+
+            getFallbackPrompts() {
+                return [
+                    { prompt_id: "P1", text: "Сделайте короткий вдох/выдох и продолжите. :)", category: "рефлексия" },
+                    { prompt_id: "P2", text: "Помните: маленькие шаги ведут к большим результатам.", category: "рефлексия" },
+                    { prompt_id: "P3", text: "Отдохните 5 минут и вернитесь к работе с новыми силами.", category: "рефлексия" }
+                ];
+            }
+        }
+
+        // Основной класс игры
+        class FinalGame {
+            constructor() {
+                this.currentQuestion = 0;
+                this.score = 0;
+                this.lives = 3;
+                this.timeRemaining = 60;
+                this.collectedWords = [];
+                this.gameRunning = false;
+                this.difficulty = 'medium';
+                this.draggedWord = null;
+                this.reflections = [];
+                this.prompts = [];
+                this.csvLoader = new CSVLoader();
+                
+                this.initializeElements();
+                this.bindEvents();
+                this.loadGameData();
+            }
+
+            initializeElements() {
+                this.screens = {
+                    menu: document.getElementById('menu'),
+                    game: document.getElementById('game'),
+                    end: document.getElementById('end'),
+                    loading: document.getElementById('loading'),
+                    error: document.getElementById('error')
+                };
+
+                this.elements = {
+                    startBtn: document.getElementById('startBtn'),
+                    difficulty: document.getElementById('difficulty'),
+                    score: document.getElementById('score'),
+                    lives: document.getElementById('lives'),
+                    timer: document.getElementById('timer'),
+                    questionText: document.getElementById('questionText'),
+                    gameArea: document.getElementById('gameArea'),
+                    dropZone: document.getElementById('dropZone'),
+                    checkBtn: document.getElementById('checkBtn'),
+                    menuBtn: document.getElementById('menuBtn'),
+                    finalScore: document.getElementById('finalScore'),
+                    randomPrompt: document.getElementById('randomPrompt'),
+                    restartBtn: document.getElementById('restartBtn'),
+                    retryBtn: document.getElementById('retryBtn')
+                };
+            }
+
+            bindEvents() {
+                this.elements.startBtn.addEventListener('click', () => this.startGame());
+                this.elements.checkBtn.addEventListener('click', () => this.checkAnswer());
+                this.elements.menuBtn.addEventListener('click', () => this.showMenu());
+                this.elements.restartBtn.addEventListener('click', () => this.startGame());
+                this.elements.retryBtn.addEventListener('click', () => this.loadGameData());
+
+                // Drag and drop events
+                this.elements.gameArea.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+                this.elements.gameArea.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+                this.elements.gameArea.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+            }
+
+            async loadGameData() {
+                this.showScreen('loading');
+                
+                try {
+                    const [reflections, prompts] = await Promise.all([
+                        this.csvLoader.loadReflections(),
+                        this.csvLoader.loadPrompts()
+                    ]);
+                    
+                    this.reflections = reflections;
+                    this.prompts = prompts;
+                    
+                    if (this.reflections.length === 0) {
+                        throw new Error('Нет доступных вопросов');
+                    }
+                    
+                    this.showScreen('menu');
+                } catch (error) {
+                    console.error('Ошибка загрузки данных:', error);
+                    this.showScreen('error');
+                }
+            }
+
+            showScreen(screenName) {
+                Object.values(this.screens).forEach(s => s.style.display = 'none');
+                this.screens[screenName].style.display = 'block';
+            }
+
+            startGame() {
+                this.difficulty = this.elements.difficulty.value;
+                this.currentQuestion = 0;
+                this.score = 0;
+                this.lives = 3;
+                this.timeRemaining = 60;
+                this.collectedWords = [];
+                this.gameRunning = true;
+
+                this.showScreen('game');
+                this.loadQuestion();
+                this.startTimer();
+            }
+
+            loadQuestion() {
+                if (this.currentQuestion >= this.reflections.length) {
+                    this.endGame();
+                    return;
+                }
+
+                const question = this.reflections[this.currentQuestion];
+                this.elements.questionText.textContent = question.prompt_text;
+                
+                this.generateWords(question);
+            }
+
+            generateWords(question) {
+                this.elements.gameArea.innerHTML = '';
+                this.wordElements = [];
+
+                const requiredWords = question.required_words;
+                const distractionWords = ["сегодня", "завтра", "потом", "сейчас", "очень", "быстро", "медленно", "иногда", "часто", "редко"];
+                
+                // Добавляем нужные слова
+                requiredWords.forEach((word, index) => {
+                    const wordElement = document.createElement('div');
+                    wordElement.className = 'word';
+                    wordElement.textContent = word;
+                    wordElement.draggable = true;
+                    wordElement.dataset.word = word;
+                    
+                    // Случайная позиция
+                    const x = Math.random() * (this.elements.gameArea.offsetWidth - 100);
+                    const y = Math.random() * (this.elements.gameArea.offsetHeight - 30);
+                    
+                    wordElement.style.left = x + 'px';
+                    wordElement.style.top = y + 'px';
+                    
+                    this.elements.gameArea.appendChild(wordElement);
+                    this.wordElements.push(wordElement);
+                });
+
+                // Добавляем отвлекающие слова
+                for (let i = 0; i < 3; i++) {
+                    const word = distractionWords[Math.floor(Math.random() * distractionWords.length)];
+                    const wordElement = document.createElement('div');
+                    wordElement.className = 'word';
+                    wordElement.textContent = word;
+                    wordElement.draggable = true;
+                    wordElement.dataset.word = word;
+                    
+                    const x = Math.random() * (this.elements.gameArea.offsetWidth - 100);
+                    const y = Math.random() * (this.elements.gameArea.offsetHeight - 30);
+                    
+                    wordElement.style.left = x + 'px';
+                    wordElement.style.top = y + 'px';
+                    
+                    this.elements.gameArea.appendChild(wordElement);
+                    this.wordElements.push(wordElement);
+                }
+            }
+
+            handleMouseDown(e) {
+                if (e.target.classList.contains('word')) {
+                    this.draggedWord = e.target;
+                    this.draggedWord.classList.add('dragging');
+                }
+            }
+
+            handleMouseMove(e) {
+                if (this.draggedWord) {
+                    const rect = this.elements.gameArea.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    
+                    this.draggedWord.style.left = x + 'px';
+                    this.draggedWord.style.top = y + 'px';
+                }
+            }
+
+            handleMouseUp(e) {
+                if (this.draggedWord) {
+                    const dropZoneRect = this.elements.dropZone.getBoundingClientRect();
+                    const wordRect = this.draggedWord.getBoundingClientRect();
+                    
+                    // Проверяем, попал ли в зону сброса
+                    if (wordRect.left < dropZoneRect.right &&
+                        wordRect.right > dropZoneRect.left &&
+                        wordRect.top < dropZoneRect.bottom &&
+                        wordRect.bottom > dropZoneRect.top) {
+                        
+                        this.collectWord(this.draggedWord);
+                    } else {
+                        // Возвращаем на место
+                        this.draggedWord.classList.remove('dragging');
+                    }
+                    
+                    this.draggedWord = null;
+                }
+            }
+
+            collectWord(wordElement) {
+                const word = wordElement.dataset.word;
+                this.collectedWords.push(word);
+                wordElement.classList.add('collected');
+                wordElement.style.display = 'none';
+                
+                // Обновляем зону сброса
+                this.elements.dropZone.innerHTML = 
+                    `<span>Собрано: ${this.collectedWords.join(', ')}</span>`;
+            }
+
+            checkAnswer() {
+                const currentData = this.reflections[this.currentQuestion];
+                const requiredWords = currentData.required_words;
+                const collectedSet = new Set(this.collectedWords);
+                const requiredSet = new Set(requiredWords);
+                
+                // Проверяем, есть ли все нужные слова
+                const hasAllWords = [...requiredSet].every(word => collectedSet.has(word));
+                
+                if (hasAllWords) {
+                    // Правильный ответ
+                    const points = this.calculatePoints();
+                    this.score += points;
+                    this.currentQuestion++;
+                    
+                    if (this.currentQuestion >= this.reflections.length) {
+                        this.endGame();
+                    } else {
+                        this.collectedWords = [];
+                        this.loadQuestion();
+                        this.timeRemaining = 60;
+                    }
+                } else {
+                    // Неправильный ответ
+                    this.lives--;
+                    if (this.lives <= 0) {
+                        this.endGame();
+                    } else {
+                        this.collectedWords = [];
+                        this.loadQuestion();
+                        this.timeRemaining = 60;
+                    }
+                }
+            }
+
+            calculatePoints() {
+                const basePoints = 100;
+                const timeBonus = Math.floor(this.timeRemaining * 2);
+                const difficultyMultiplier = {
+                    'easy': 1,
+                    'medium': 1.5,
+                    'hard': 2
+                }[this.difficulty] || 1;
+                
+                return Math.floor((basePoints + timeBonus) * difficultyMultiplier);
+            }
+
+            endGame() {
+                this.gameRunning = false;
+                this.elements.finalScore.textContent = this.score;
+                
+                const randomPrompt = this.prompts[Math.floor(Math.random() * this.prompts.length)];
+                this.elements.randomPrompt.textContent = randomPrompt ? randomPrompt.text : "Сделайте короткий вдох/выдох и продолжите. :)";
+                
+                this.showScreen('end');
+            }
+
+            showMenu() {
+                this.gameRunning = false;
+                this.showScreen('menu');
+            }
+
+            startTimer() {
+                const timer = setInterval(() => {
+                    if (!this.gameRunning) {
+                        clearInterval(timer);
+                        return;
+                    }
+                    
+                    this.timeRemaining--;
+                    this.elements.timer.textContent = this.timeRemaining;
+                    this.elements.score.textContent = this.score;
+                    this.elements.lives.textContent = this.lives;
+                    
+                    if (this.timeRemaining <= 0) {
+                        this.lives--;
+                        if (this.lives <= 0) {
+                            this.endGame();
+                        } else {
+                            this.timeRemaining = 60;
+                            this.collectedWords = [];
+                            this.loadQuestion();
+                        }
+                    }
+                }, 1000);
+            }
+        }
+
+        // Запускаем игру
+        const game = new FinalGame();
+    </script>
+</body>
+</html>
