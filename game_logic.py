@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Optional
 import random
 import time
+import re
 from csv_processor import CSVQuestionLoader, ReflectionQuestion
 
 class GameState(Enum):
