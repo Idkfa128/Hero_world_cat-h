@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Word Catch</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <div id="menu" class="screen active">
+            <h1 class="title" id="title">WORD CATCH</h1>
+            <p class="subtitle" id="subtitle">данная игра — метод расслабления. играйте в удовольствие.</p>
+            <div class="options" id="options">
+                <label>
+                    Сложность
+                    <select id="difficulty">
+                        <option value="easy">Лёгкая</option>
+                        <option value="medium" selected>Средняя</option>
+                        <option value="hard">Сложная</option>
+                    </select>
+                </label>
+                <label>
+                    Режим окна
+                    <select id="screenMode">
+                        <option value="window">В окне</option>
+                        <option value="fullscreen">Полный экран</option>
+                    </select>
+                </label>
+            </div>
+            <button id="startBtn" class="btn">Начать</button>
+            <div class="authors" id="authors">Авторы: команда np hero</div>
+            
+            <!-- Эффекты частиц -->
+            <canvas id="particlesCanvas" class="particles-canvas"></canvas>
+        </div>
+
+        <div id="game" class="screen">
+            <div class="game-window" id="gameWindow">
+                <div class="window-header">
+                    <div class="window-title">WORD CATCH - Игра</div>
+                    <div class="window-controls">
+                        <button class="window-btn minimize" id="minimizeBtn" title="Свернуть">_</button>
+                        <button class="window-btn maximize" id="maximizeBtn" title="Развернуть">□</button>
+                        <button class="window-btn close" id="closeBtn" title="Закрыть">×</button>
+                    </div>
+                </div>
+                <div class="window-content">
+                    <div class="hud" id="hud">
+                        <div id="scoreDisplay">Очки: <span id="score">0</span></div>
+                        <div id="livesDisplay">Жизни: <span id="lives">3</span></div>
+                        <div id="timerDisplay">Время: <span id="timer">60</span>с</div>
+                    </div>
+                    <div class="question" id="questionDisplay">Вопрос: <span id="questionText"></span></div>
+                    <canvas id="gameCanvas" width="900" height="540"></canvas>
+                    <div class="dropbar" id="dropbarDisplay">Соберите ответ перетаскиванием слов ↓</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="end" class="screen">
+            <h2>Время!</h2>
+            <p class="result">Ваш результат: <span id="finalScore">0</span></p>
+            <p class="prompt">Совет: <span id="randomPrompt"></span></p>
+            <button id="backToMenu" class="btn"></button>
+        </div>
+
+        <div id="loading" class="screen">
+            <div class="loading">
+                <h2>Загрузка данных...</h2>
+                <p>Пожалуйста, подождите</p>
+            </div>
+        </div>
+
+        <div id="error" class="screen">
+            <div class="error">
+                <h2>Ошибка загрузки</h2>
+                <p>Не удалось загрузить данные игры</p>
+                <button id="retryBtn" class="btn">Попробовать снова</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="csv-loader.js"></script>
+    <script src="menu-effects.js"></script>
+    <script>
+        // Оптимизированная игровая логика
+        class WordCatchGame {
+            constructor() {
+                this.currentQuestionIndex = 0;
+                this.score = 0;
+                this.lives = 3;
+                this.timeRemaining = 60;
+                this.collectedWords = [];
+                this.flyingWords = [];
+                this.gameRunning = false;
+                this.difficulty = 'medium';
+                this.draggedWord = null;
+                this.reflections = [];
+                this.prompts = [];
+                this.csvLoader = new CSVLoader();
+                this.animationId = null;
+                this.menuAnimations = new MenuAnimations();
+                this.gameAnimations = new GameAnimations();
+                
+                this.initializeElements();
+                this.bindEvents();
+                this.loadGameData();
+            }
+
+            initializeElements() {
+                this.screens = {
+                    menu: document.getElementById('menu'),
+                    game: document.getElementById('game'),
+                    end: document.getElementById('end'),
+                    loading: document.getElementById('loading'),
+                    error: document.getElementById('error')
+                };
+
+                this.elements = {
+                    startBtn: document.getElementById('startBtn'),
+                    difficulty: document.getElementById('difficulty'),
+                    screenMode: document.getElementById('screenMode'),
+                    score: document.getElementById('score'),
+                    lives: document.getElementById('lives'),
+                    timer: document.getElementById('timer'),
+                    questionText: document.getElementById('questionText'),
+                    canvas: document.getElementById('gameCanvas'),
+                    finalScore: document.getElementById('finalScore'),
+                    randomPrompt: document.getElementById('randomPrompt'),
+                    backToMenu: document.getElementById('backToMenu'),
+                    retryBtn: document.getElementById('retryBtn')
+                };
+
+                this.ctx = this.elements.canvas.getContext('2d');
+            }
+
+            bindEvents() {
+                this.elements.startBtn.addEventListener('click', () => this.startGame());
+                this.elements.backToMenu.addEventListener('click', () => this.showMenu());
+                this.elements.retryBtn.addEventListener('click', () => this.loadGameData());
+
+                // Window control events
+                this.bindWindowEvents();
+
+                // Canvas events
+                this.elements.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+                this.elements.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+                this.elements.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+            }
+
+            bindWindowEvents() {
+                const gameWindow = document.getElementById('gameWindow');
+                const minimizeBtn = document.getElementById('minimizeBtn');
+                const maximizeBtn = document.getElementById('maximizeBtn');
+                const closeBtn = document.getElementById('closeBtn');
+                const windowHeader = gameWindow.querySelector('.window-header');
+
+                // Перетаскивание окна
+                let isDragging = false;
+                let currentX;
+                let currentY;
+                let initialX;
+                let initialY;
+                let xOffset = 0;
+                let yOffset = 0;
+
+                windowHeader.addEventListener('mousedown', (e) => {
+                    if (e.target.classList.contains('window-btn')) return;
+                    
+                    initialX = e.clientX - xOffset;
+                    initialY = e.clientY - yOffset;
+
+                    if (e.target === windowHeader || windowHeader.contains(e.target)) {
+                        isDragging = true;
+                    }
+                });
+
+                document.addEventListener('mousemove', (e) => {
+                    if (isDragging) {
+                        e.preventDefault();
+                        currentX = e.clientX - initialX;
+                        currentY = e.clientY - initialY;
+
+                        xOffset = currentX;
+                        yOffset = currentY;
+
+                        // Используем requestAnimationFrame для плавности
+                        requestAnimationFrame(() => {
+                            gameWindow.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
+                        });
+                    }
+                });
+
+                document.addEventListener('mouseup', () => {
+                    initialX = currentX;
+                    initialY = currentY;
+                    isDragging = false;
+                });
+
+                // Кнопки управления окном
+                minimizeBtn.addEventListener('click', () => {
+                    // Паузим игру
+                    this.gameRunning = false;
+                    if (this.animationId) {
+                        cancelAnimationFrame(this.animationId);
+                        this.animationId = null;
+                    }
+                    
+                    // Сворачиваем окно - добавляем класс minimized
+                    gameWindow.classList.add('minimized');
+                    
+                    // НЕ скрываем меню - оставляем его видимым
+                });
+
+                maximizeBtn.addEventListener('click', () => {
+                    if (gameWindow.classList.contains('maximized')) {
+                        gameWindow.classList.remove('maximized');
+                        gameWindow.style.width = '';
+                        gameWindow.style.height = '';
+                        gameWindow.style.top = '';
+                        gameWindow.style.left = '';
+                        gameWindow.style.transform = `translate3d(${xOffset}px, ${yOffset}px, 0)`;
+                        maximizeBtn.textContent = '□';
+                    } else {
+                        gameWindow.classList.add('maximized');
+                        gameWindow.style.width = '100vw';
+                        gameWindow.style.height = '100vh';
+                        gameWindow.style.top = '0';
+                        gameWindow.style.left = '0';
+                        gameWindow.style.transform = 'none';
+                        maximizeBtn.textContent = '❐';
+                    }
+                });
+
+                closeBtn.addEventListener('click', () => {
+                    this.endGame();
+                    this.hideMenu(); // Скрываем меню после закрытия игры
+                });
+
+                // Восстановление окна при клике на заголовок свернутого окна
+                windowHeader.addEventListener('dblclick', () => {
+                    if (gameWindow.classList.contains('minimized')) {
+                        // Восстанавливаем окно
+                        gameWindow.classList.remove('minimized');
+                        
+                        // Возобновляем игру
+                        this.gameRunning = true;
+                        this.startGameLoop();
+                    }
+                });
+            }
+
+            async loadGameData() {
+                this.showScreen('loading');
+                
+                try {
+                    const [reflections, prompts] = await Promise.all([
+                        this.csvLoader.loadReflections(),
+                        this.csvLoader.loadPrompts()
+                    ]);
+                    
+                    this.reflections = reflections;
+                    this.prompts = prompts;
+                    
+                    if (this.reflections.length === 0) {
+                        throw new Error('Нет доступных вопросов');
+                    }
+                    
+                    this.showScreen('menu');
+                    
+                    // Запускаем анимации меню
+                    setTimeout(() => {
+                        this.menuAnimations.startMenuSequence();
+                    }, 100);
+                } catch (error) {
+                    console.error('Ошибка загрузки данных:', error);
+                    this.showScreen('error');
+                }
+            }
+
+            showScreen(screenName) {
+                Object.values(this.screens).forEach(s => s.classList.remove('active'));
+                this.screens[screenName].classList.add('active');
+                
+                // Если показываем игровой экран, меню остается видимым сзади
+                if (screenName === 'game') {
+                    this.screens.menu.classList.add('active');
+                }
+            }
+
+            startGame() {
+                this.difficulty = this.elements.difficulty.value;
+                this.currentQuestionIndex = 0;
+                this.score = 0;
+                this.lives = 3;
+                this.timeRemaining = 60;
+                this.collectedWords = [];
+                this.gameRunning = true;
+
+                this.showScreen('game');
+                this.loadCurrentQuestion();
+                
+                // Запускаем анимации игрового экрана
+                this.gameAnimations.startGameSequence();
+                
+                // Запускаем игровой цикл после анимаций
+                setTimeout(() => {
+                    this.startGameLoop();
+                }, 6000);
+            }
+
+            loadCurrentQuestion() {
+                if (this.currentQuestionIndex >= this.reflections.length) {
+                    this.endGame();
+                    return;
+                }
+
+                const question = this.reflections[this.currentQuestionIndex];
+                this.elements.questionText.textContent = question.prompt_text;
+                
+                this.generateFlyingWords(question);
+            }
+
+            generateFlyingWords(question) {
+                this.flyingWords = [];
+                const requiredWords = question.required_words;
+                const distractionWords = ["сегодня", "завтра", "потом", "сейчас", "очень", "быстро", "медленно", "иногда", "часто", "редко"];
+                
+                // Добавляем нужные слова
+                requiredWords.forEach(word => {
+                    this.flyingWords.push({
+                        word: word,
+                        x: Math.random() * 800,
+                        y: Math.random() * 400,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: (Math.random() - 0.5) * 2,
+                        collected: false
+                    });
+                });
+
+                // Добавляем отвлекающие слова
+                for (let i = 0; i < 3; i++) {
+                    const word = distractionWords[Math.floor(Math.random() * distractionWords.length)];
+                    this.flyingWords.push({
+                        word: word,
+                        x: Math.random() * 800,
+                        y: Math.random() * 400,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: (Math.random() - 0.5) * 2,
+                        collected: false
+                    });
+                }
+
+                // Перемешиваем
+                this.flyingWords.sort(() => Math.random() - 0.5);
+            }
+
+            handleMouseDown(e) {
+                if (!this.gameRunning) return;
+                
+                const rect = this.elements.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                for (const word of this.flyingWords) {
+                    if (!word.collected && this.isPointInWord(x, y, word)) {
+                        this.draggedWord = word;
+                        break;
+                    }
+                }
+            }
+
+            handleMouseMove(e) {
+                if (!this.draggedWord) return;
+                
+                const rect = this.elements.canvas.getBoundingClientRect();
+                this.draggedWord.x = e.clientX - rect.left;
+                this.draggedWord.y = e.clientY - rect.top;
+            }
+
+            handleMouseUp(e) {
+                if (!this.draggedWord) return;
+                
+                const rect = this.elements.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                // Проверяем, попал ли в зону сброса
+                const dropZone = { x: 20, y: 460, w: 860, h: 60 };
+                if (x >= dropZone.x && x <= dropZone.x + dropZone.w && 
+                    y >= dropZone.y && y <= dropZone.y + dropZone.h) {
+                    
+                    this.draggedWord.collected = true;
+                    this.collectedWords.push(this.draggedWord.word);
+                    this.checkAnswer();
+                }
+
+                this.draggedWord = null;
+            }
+
+            isPointInWord(px, py, word) {
+                const width = word.word.length * 9;
+                const height = 16;
+                return px >= word.x && px <= word.x + width && py >= word.y && py <= word.y + height;
+            }
+
+            checkAnswer() {
+                const currentQuestion = this.reflections[this.currentQuestionIndex];
+                const requiredWords = new Set(currentQuestion.required_words);
+                const collectedWords = new Set(this.collectedWords);
+
+                // Проверяем, собраны ли все нужные слова
+                const hasAllWords = [...requiredWords].every(word => collectedWords.has(word));
+                
+                if (hasAllWords) {
+                    // Правильный ответ
+                    const points = this.calculatePoints();
+                    this.score += points;
+                    this.currentQuestionIndex++;
+                    
+                    if (this.currentQuestionIndex >= this.reflections.length) {
+                        this.endGame();
+                    } else {
+                        this.collectedWords = [];
+                        this.loadCurrentQuestion();
+                        this.timeRemaining = 60;
+                    }
+                }
+            }
+
+            calculatePoints() {
+                const basePoints = 100;
+                const timeBonus = Math.floor(this.timeRemaining * 2);
+                const difficultyMultiplier = {
+                    'easy': 1,
+                    'medium': 1.5,
+                    'hard': 2
+                }[this.difficulty] || 1;
+                
+                return Math.floor((basePoints + timeBonus) * difficultyMultiplier);
+            }
+
+            endGame() {
+                this.gameRunning = false;
+                if (this.animationId) {
+                    cancelAnimationFrame(this.animationId);
+                }
+                
+                this.elements.finalScore.textContent = this.score;
+                
+                // Случайный промпт
+                const randomPrompt = this.prompts[Math.floor(Math.random() * this.prompts.length)];
+                this.elements.randomPrompt.textContent = randomPrompt ? randomPrompt.text : "Сделайте короткий вдох/выдох и продолжите. :)";
+                
+                this.showScreen('end');
+                
+                // Автоматически возвращаемся в меню через 5 секунд
+                setTimeout(() => this.showMenu(), 5000);
+            }
+
+            showMenu() {
+                this.gameRunning = false;
+                if (this.animationId) {
+                    cancelAnimationFrame(this.animationId);
+                }
+                
+                // Скрываем игровой экран и возвращаем меню к обычному состоянию
+                this.screens.game.classList.remove('active');
+                this.screens.menu.classList.add('active');
+                
+                // Показываем кнопку "Начать" и скрываем "В МЕНЮ"
+                this.elements.startBtn.style.display = 'block';
+                this.elements.backToMenuBtn.style.display = 'none';
+                
+                // Восстанавливаем окно игры если оно было свернуто
+                const gameWindow = document.getElementById('gameWindow');
+                if (gameWindow) {
+                    gameWindow.classList.remove('minimized');
+                    gameWindow.classList.remove('maximized');
+                }
+                
+                // Сбрасываем и перезапускаем анимации меню
+                this.menuAnimations.reset();
+                setTimeout(() => {
+                    this.menuAnimations.startMenuSequence();
+                }, 100);
+            }
+
+            // Новый метод для скрытия меню после закрытия игры
+            hideMenu() {
+                this.screens.menu.classList.remove('active');
+                this.screens.game.classList.remove('active');
+                // Просто скрываем все экраны
+            }
+
+            update(deltaTime) {
+                if (!this.gameRunning) return;
+
+                this.timeRemaining -= deltaTime;
+                if (this.timeRemaining <= 0) {
+                    this.lives--;
+                    if (this.lives <= 0) {
+                        this.endGame();
+                        return;
+                    }
+                    this.timeRemaining = 60;
+                    this.collectedWords = [];
+                    this.loadCurrentQuestion();
+                }
+
+                // Обновляем позиции летающих слов
+                for (const word of this.flyingWords) {
+                    if (!word.collected) {
+                        word.x += word.vx;
+                        word.y += word.vy;
+
+                        // Отскок от границ
+                        if (word.x < 0 || word.x > 800) word.vx *= -1;
+                        if (word.y < 0 || word.y > 400) word.vy *= -1;
+                        
+                        word.x = Math.max(0, Math.min(800, word.x));
+                        word.y = Math.max(0, Math.min(400, word.y));
+                    }
+                }
+            }
+
+            draw() {
+                // Очищаем canvas
+                this.ctx.fillStyle = '#071012';
+                this.ctx.fillRect(0, 0, 900, 540);
+
+                // Рисуем зону сброса
+                this.ctx.strokeStyle = '#00ffaa';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(20, 460, 860, 60);
+
+                // Рисуем летающие слова
+                this.ctx.fillStyle = '#7dfaa7';
+                this.ctx.font = '16px "Share Tech Mono"';
+                this.ctx.textBaseline = 'top';
+                
+                for (const word of this.flyingWords) {
+                    if (!word.collected) {
+                        this.ctx.fillText(word.word, Math.floor(word.x), Math.floor(word.y));
+                    }
+                }
+
+                // Рисуем собранные слова
+                this.ctx.fillStyle = '#d0ffd0';
+                this.ctx.fillText(this.collectedWords.join(' '), 30, 470);
+
+                // Обновляем HUD
+                this.elements.score.textContent = this.score;
+                this.elements.lives.textContent = this.lives;
+                this.elements.timer.textContent = Math.max(0, Math.floor(this.timeRemaining));
+            }
+
+            startGameLoop() {
+                const gameLoop = (timestamp) => {
+                    if (!this.gameRunning) return;
+                    
+                    const deltaTime = (timestamp - (this.lastTime || timestamp)) / 1000;
+                    this.lastTime = timestamp;
+
+                    this.update(deltaTime);
+                    this.draw();
+
+                    this.animationId = requestAnimationFrame(gameLoop);
+                };
+                
+                this.animationId = requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // Запускаем игру
+        const game = new WordCatchGame();
+    </script>
+</body>
+</html>
