@@ -150,6 +150,7 @@
                 this.elements.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
                 this.elements.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
                 this.elements.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+                this.elements.canvas.addEventListener('dblclick', (e) => this.handleDoubleClick(e));
             }
 
             bindWindowEvents() {
@@ -188,9 +189,10 @@
                         xOffset = currentX;
                         yOffset = currentY;
 
-                        // Используем requestAnimationFrame для плавности
+                        // Используем requestAnimationFrame для плавности с дополнительными эффектами
                         requestAnimationFrame(() => {
-                            gameWindow.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
+                            gameWindow.style.transform = `translate3d(${currentX}px, ${currentY}px, 0) scale(1.02)`;
+                            gameWindow.style.boxShadow = `0 0 30px rgba(0, 255, 170, 0.5)`;
                         });
                     }
                 });
@@ -199,6 +201,12 @@
                     initialX = currentX;
                     initialY = currentY;
                     isDragging = false;
+                    
+                    // Возвращаем окно к нормальному состоянию
+                    requestAnimationFrame(() => {
+                        gameWindow.style.transform = `translate3d(${currentX}px, ${currentY}px, 0) scale(1)`;
+                        gameWindow.style.boxShadow = `0 0 20px rgba(0, 255, 170, 0.3)`;
+                    });
                 });
 
                 // Кнопки управления окном
@@ -283,8 +291,36 @@
             }
 
             showScreen(screenName) {
-                Object.values(this.screens).forEach(s => s.classList.remove('active'));
-                this.screens[screenName].classList.add('active');
+                // Плавный переход между экранами
+                Object.values(this.screens).forEach(s => {
+                    if (s.classList.contains('active')) {
+                        s.style.opacity = '0';
+                        s.style.transform = 'scale(0.95) translateY(20px)';
+                        s.style.filter = 'blur(5px)';
+                        
+                        setTimeout(() => {
+                            s.classList.remove('active');
+                            s.style.opacity = '';
+                            s.style.transform = '';
+                            s.style.filter = '';
+                        }, 300);
+                    }
+                });
+                
+                // Показываем новый экран с анимацией
+                setTimeout(() => {
+                    this.screens[screenName].classList.add('active');
+                    this.screens[screenName].style.opacity = '0';
+                    this.screens[screenName].style.transform = 'scale(0.95) translateY(20px)';
+                    this.screens[screenName].style.filter = 'blur(5px)';
+                    
+                    requestAnimationFrame(() => {
+                        this.screens[screenName].style.transition = 'all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                        this.screens[screenName].style.opacity = '1';
+                        this.screens[screenName].style.transform = 'scale(1) translateY(0)';
+                        this.screens[screenName].style.filter = 'blur(0px)';
+                    });
+                }, 300);
                 
                 // Если показываем игровой экран, меню остается видимым сзади
                 if (screenName === 'game') {
@@ -330,14 +366,30 @@
                 const requiredWords = question.required_words;
                 const distractionWords = ["сегодня", "завтра", "потом", "сейчас", "очень", "быстро", "медленно", "иногда", "часто", "редко"];
                 
+                // Определяем скорость в зависимости от сложности
+                let speedMultiplier;
+                switch(this.difficulty) {
+                    case 'easy':
+                        speedMultiplier = 1.2; // Увеличена скорость для лёгкой сложности
+                        break;
+                    case 'medium':
+                        speedMultiplier = 1.8; // Увеличена средняя скорость
+                        break;
+                    case 'hard':
+                        speedMultiplier = 2.2; // Сложная остается без изменений
+                        break;
+                    default:
+                        speedMultiplier = 1.8;
+                }
+                
                 // Добавляем нужные слова
                 requiredWords.forEach(word => {
                     this.flyingWords.push({
                         word: word,
                         x: Math.random() * 800,
                         y: Math.random() * 400,
-                        vx: (Math.random() - 0.5) * 2,
-                        vy: (Math.random() - 0.5) * 2,
+                        vx: (Math.random() - 0.5) * 2 * speedMultiplier,
+                        vy: (Math.random() - 0.5) * 2 * speedMultiplier,
                         collected: false
                     });
                 });
@@ -349,8 +401,8 @@
                         word: word,
                         x: Math.random() * 800,
                         y: Math.random() * 400,
-                        vx: (Math.random() - 0.5) * 2,
-                        vy: (Math.random() - 0.5) * 2,
+                        vx: (Math.random() - 0.5) * 2 * speedMultiplier,
+                        vy: (Math.random() - 0.5) * 2 * speedMultiplier,
                         collected: false
                     });
                 }
@@ -358,6 +410,7 @@
                 // Перемешиваем
                 this.flyingWords.sort(() => Math.random() - 0.5);
             }
+
 
             handleMouseDown(e) {
                 if (!this.gameRunning) return;
@@ -389,17 +442,71 @@
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
 
-                // Проверяем, попал ли в зону сброса
-                const dropZone = { x: 20, y: 460, w: 860, h: 60 };
+                // Проверяем, попал ли в зону сброса (в самом низу)
+                const dropZone = { x: 0, y: 480, w: 900, h: 60 };
                 if (x >= dropZone.x && x <= dropZone.x + dropZone.w && 
                     y >= dropZone.y && y <= dropZone.y + dropZone.h) {
                     
-                    this.draggedWord.collected = true;
-                    this.collectedWords.push(this.draggedWord.word);
-                    this.checkAnswer();
+                    // Вставляем слово в поле при отпускании ЛКМ
+                    this.insertWordToField(this.draggedWord.word);
+                } else {
+                    // Если не попал в зону, возвращаем слово на исходную позицию
+                    // Можно добавить анимацию возврата, но пока просто оставляем где отпустили
                 }
 
                 this.draggedWord = null;
+            }
+
+            // Новая функция для вставки слова в поле
+            insertWordToField(word) {
+                // Проверяем, не добавлено ли уже это слово
+                if (!this.collectedWords.includes(word)) {
+                    this.collectedWords.push(word);
+                    this.checkAnswer();
+                }
+                
+                // Помечаем слово как собранное (исчезает)
+                const flyingWord = this.flyingWords.find(w => w.word === word && !w.collected);
+                if (flyingWord) {
+                    flyingWord.collected = true;
+                }
+            }
+
+            // Функция для удаления слова из поля
+            removeWordFromField(word) {
+                const index = this.collectedWords.indexOf(word);
+                if (index > -1) {
+                    this.collectedWords.splice(index, 1);
+                }
+            }
+
+            // Обработка двойного клика для удаления слов из поля
+            handleDoubleClick(e) {
+                if (!this.gameRunning) return;
+                
+                const rect = this.elements.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                // Проверяем, кликнули ли по слову в поле составления
+                const fieldY = 500;
+                const fieldHeight = 20;
+                
+                if (y >= fieldY && y <= fieldY + fieldHeight) {
+                    // Находим слово, по которому кликнули
+                    let currentX = 30;
+                    for (let i = 0; i < this.collectedWords.length; i++) {
+                        const word = this.collectedWords[i];
+                        const wordWidth = word.length * 9;
+                        
+                        if (x >= currentX && x <= currentX + wordWidth) {
+                            // Удаляем слово из поля
+                            this.removeWordFromField(word);
+                            break;
+                        }
+                        currentX += 80; // Отступ между словами
+                    }
+                }
             }
 
             isPointInWord(px, py, word) {
@@ -518,14 +625,31 @@
                         word.x += word.vx;
                         word.y += word.vy;
 
-                        // Отскок от границ
-                        if (word.x < 0 || word.x > 800) word.vx *= -1;
-                        if (word.y < 0 || word.y > 400) word.vy *= -1;
+                        // Отскок от границ с случайным направлением
+                        if (word.x < 0) {
+                            word.x = 0;
+                            word.vx = Math.abs(word.vx) + (Math.random() - 0.5) * 0.5;
+                        }
+                        if (word.x > 800) {
+                            word.x = 800;
+                            word.vx = -Math.abs(word.vx) - (Math.random() - 0.5) * 0.5;
+                        }
+                        if (word.y < 0) {
+                            word.y = 0;
+                            word.vy = Math.abs(word.vy) + (Math.random() - 0.5) * 0.5;
+                        }
+                        if (word.y > 460) {
+                            word.y = 460;
+                            word.vy = -Math.abs(word.vy) - (Math.random() - 0.5) * 0.5;
+                        }
                         
-                        word.x = Math.max(0, Math.min(800, word.x));
-                        word.y = Math.max(0, Math.min(400, word.y));
+                        // Ограничиваем скорость, чтобы слова не летели слишком быстро
+                        const maxSpeed = 3;
+                        word.vx = Math.max(-maxSpeed, Math.min(maxSpeed, word.vx));
+                        word.vy = Math.max(-maxSpeed, Math.min(maxSpeed, word.vy));
                     }
                 }
+
             }
 
             draw() {
@@ -533,10 +657,20 @@
                 this.ctx.fillStyle = '#071012';
                 this.ctx.fillRect(0, 0, 900, 540);
 
-                // Рисуем зону сброса
+                // Рисуем зону сброса (внизу без верхней границы)
                 this.ctx.strokeStyle = '#00ffaa';
                 this.ctx.lineWidth = 2;
-                this.ctx.strokeRect(20, 460, 860, 60);
+                // Рисуем только нижнюю, левую и правую границы
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, 480); // Левая граница
+                this.ctx.lineTo(0, 540); // Левый нижний угол
+                this.ctx.lineTo(900, 540); // Нижняя граница
+                this.ctx.lineTo(900, 480); // Правый нижний угол
+                this.ctx.stroke();
+                
+                // Добавляем полупрозрачный фон для зоны сброса
+                this.ctx.fillStyle = 'rgba(0, 255, 170, 0.1)';
+                this.ctx.fillRect(0, 480, 900, 60);
 
                 // Рисуем летающие слова
                 this.ctx.fillStyle = '#7dfaa7';
@@ -549,9 +683,17 @@
                     }
                 }
 
-                // Рисуем собранные слова
+
+                // Рисуем собранные слова в правильных позициях
                 this.ctx.fillStyle = '#d0ffd0';
-                this.ctx.fillText(this.collectedWords.join(' '), 30, 470);
+                this.ctx.font = '16px "Share Tech Mono"';
+                this.ctx.textBaseline = 'top';
+                
+                this.collectedWords.forEach((word, index) => {
+                    const x = 30 + (index * 80); // Уменьшен отступ между словами
+                    const y = 500; // Позиция внизу
+                    this.ctx.fillText(word, x, y);
+                });
 
                 // Обновляем HUD
                 this.elements.score.textContent = this.score;

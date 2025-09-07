@@ -6,6 +6,7 @@ class MenuEffects {
         this.particlesCtx = null;
         this.animationId = null;
         this.isInitialized = false;
+        this.fallingWords = []; // Массив для падающих слов в меню
     }
 
     init() {
@@ -16,6 +17,7 @@ class MenuEffects {
         
         this.particlesCtx = this.particlesCanvas.getContext('2d');
         this.resizeCanvas();
+        this.initializeFallingWords(); // Инициализируем падающие слова
         
         window.addEventListener('resize', () => this.resizeCanvas());
         this.isInitialized = true;
@@ -28,14 +30,64 @@ class MenuEffects {
         this.particlesCanvas.height = window.innerHeight;
     }
 
+    // Инициализация падающих слов в меню
+    initializeFallingWords() {
+        const sideWords = [
+            // Основные IT термины
+            "код", "данные", "система", "алгоритм", "программа", "функция", "переменная", "массив", "объект", "класс", "метод", "интерфейс", "модуль", "библиотека", "фреймворк", "база", "сервер", "клиент", "API", "JSON", "XML", "HTML", "CSS", "JS", "SQL", "HTTP", "TCP", "IP", "DNS", "SSL",
+            // Языки программирования
+            "Python", "Java", "C++", "C#", "PHP", "Ruby", "Go", "Rust", "Swift", "Kotlin", "TypeScript", "Dart", "Scala", "Perl", "Lua", "R", "MATLAB", "Assembly", "Bash", "PowerShell",
+            // Технологии и фреймворки
+            "React", "Vue", "Angular", "Node.js", "Express", "Django", "Flask", "Spring", "Laravel", "Symfony", "Rails", "ASP.NET", "jQuery", "Bootstrap", "Tailwind", "Sass", "Less", "Webpack", "Vite", "Gulp",
+            // Базы данных
+            "MySQL", "PostgreSQL", "MongoDB", "Redis", "Elasticsearch", "Cassandra", "Neo4j", "SQLite", "Oracle", "SQL Server", "MariaDB", "CouchDB", "DynamoDB", "InfluxDB",
+            // Облачные технологии
+            "AWS", "Azure", "GCP", "Docker", "Kubernetes", "Terraform", "Jenkins", "GitLab", "GitHub", "Bitbucket", "Heroku", "Vercel", "Netlify", "Cloudflare", "CDN", "S3", "Lambda", "EC2", "RDS",
+            // Методологии и процессы
+            "Agile", "Scrum", "DevOps", "CI/CD", "TDD", "BDD", "Microservices", "REST", "GraphQL", "OAuth", "JWT", "OOP", "SOLID", "DRY", "KISS", "YAGNI", "MVP", "CRUD", "MVC", "MVP",
+            // Инструменты разработки
+            "Git", "VS Code", "IntelliJ", "Eclipse", "Sublime", "Atom", "Vim", "Emacs", "Postman", "Insomnia", "Figma", "Sketch", "Photoshop", "Illustrator", "Zeplin", "InVision", "Framer", "Principle",
+            // Операционные системы
+            "Linux", "Windows", "macOS", "Ubuntu", "CentOS", "Debian", "Fedora", "Arch", "FreeBSD", "OpenBSD", "Android", "iOS", "ChromeOS", "Solaris", "AIX", "HP-UX",
+            // Сетевые технологии
+            "Ethernet", "WiFi", "Bluetooth", "NFC", "VPN", "Proxy", "Firewall", "Router", "Switch", "Gateway", "Load Balancer", "Reverse Proxy", "SSL/TLS", "HTTPS", "FTP", "SSH", "Telnet", "SMTP", "POP3", "IMAP",
+            // Искусственный интеллект
+            "Machine Learning", "Deep Learning", "Neural Network", "TensorFlow", "PyTorch", "Keras", "Scikit-learn", "Pandas", "NumPy", "Matplotlib", "Seaborn", "Jupyter", "OpenCV", "NLTK", "spaCy", "BERT", "GPT", "YOLO", "ResNet", "LSTM"
+        ];
+        
+        // Создаем падающие слова для левой стороны (больше слов)
+        for (let i = 0; i < 15; i++) {
+            this.fallingWords.push({
+                word: sideWords[Math.floor(Math.random() * sideWords.length)],
+                x: Math.random() * 200, // Расширенная левая сторона (0-200px)
+                y: Math.random() * window.innerHeight - 200, // Начинаем выше экрана
+                speed: Math.random() * 2.5 + 0.3, // Разная скорость падения
+                opacity: Math.random() * 0.6 + 0.1, // Больше вариативности прозрачности
+                side: 'left'
+            });
+        }
+        
+        // Создаем падающие слова для правой стороны (больше слов)
+        for (let i = 0; i < 15; i++) {
+            this.fallingWords.push({
+                word: sideWords[Math.floor(Math.random() * sideWords.length)],
+                x: window.innerWidth - 200 + Math.random() * 200, // Расширенная правая сторона
+                y: Math.random() * window.innerHeight - 200, // Начинаем выше экрана
+                speed: Math.random() * 2.5 + 0.3, // Разная скорость падения
+                opacity: Math.random() * 0.6 + 0.1, // Больше вариативности прозрачности
+                side: 'right'
+            });
+        }
+    }
+
     // Создание частиц при приземлении заголовка
     createLandingParticles(x, y) {
-        const particleCount = 20;
+        const particleCount = 30;
         
         for (let i = 0; i < particleCount; i++) {
             const angle = (Math.PI * 2 * i) / particleCount;
-            const speed = Math.random() * 3 + 2;
-            const size = Math.random() * 4 + 2;
+            const speed = Math.random() * 4 + 3;
+            const size = Math.random() * 5 + 2;
             
             this.particles.push({
                 x: x,
@@ -44,8 +96,10 @@ class MenuEffects {
                 vy: Math.sin(angle) * speed,
                 size: size,
                 life: 1.0,
-                decay: Math.random() * 0.02 + 0.01,
-                color: `hsl(${120 + Math.random() * 40}, 100%, ${50 + Math.random() * 30}%)`
+                decay: Math.random() * 0.015 + 0.008,
+                color: `hsl(${120 + Math.random() * 40}, 100%, ${50 + Math.random() * 30}%)`,
+                rotation: Math.random() * Math.PI * 2,
+                rotationSpeed: (Math.random() - 0.5) * 0.2
             });
         }
     }
@@ -57,11 +111,59 @@ class MenuEffects {
             
             particle.x += particle.vx;
             particle.y += particle.vy;
-            particle.vy += 0.1; // гравитация
+            particle.vy += 0.08; // гравитация
             particle.life -= particle.decay;
+            particle.rotation += particle.rotationSpeed;
+            
+            // Добавляем сопротивление воздуха
+            particle.vx *= 0.99;
+            particle.vy *= 0.99;
             
             if (particle.life <= 0) {
                 this.particles.splice(i, 1);
+            }
+        }
+
+        // Обновляем падающие слова
+        for (let i = this.fallingWords.length - 1; i >= 0; i--) {
+            const fallingWord = this.fallingWords[i];
+            fallingWord.y += fallingWord.speed;
+            
+            // Если слово упало за экран, создаем новое
+            if (fallingWord.y > window.innerHeight + 50) {
+                const sideWords = [
+                    // Основные IT термины
+                    "код", "данные", "система", "алгоритм", "программа", "функция", "переменная", "массив", "объект", "класс", "метод", "интерфейс", "модуль", "библиотека", "фреймворк", "база", "сервер", "клиент", "API", "JSON", "XML", "HTML", "CSS", "JS", "SQL", "HTTP", "TCP", "IP", "DNS", "SSL",
+                    // Языки программирования
+                    "Python", "Java", "C++", "C#", "PHP", "Ruby", "Go", "Rust", "Swift", "Kotlin", "TypeScript", "Dart", "Scala", "Perl", "Lua", "R", "MATLAB", "Assembly", "Bash", "PowerShell",
+                    // Технологии и фреймворки
+                    "React", "Vue", "Angular", "Node.js", "Express", "Django", "Flask", "Spring", "Laravel", "Symfony", "Rails", "ASP.NET", "jQuery", "Bootstrap", "Tailwind", "Sass", "Less", "Webpack", "Vite", "Gulp",
+                    // Базы данных
+                    "MySQL", "PostgreSQL", "MongoDB", "Redis", "Elasticsearch", "Cassandra", "Neo4j", "SQLite", "Oracle", "SQL Server", "MariaDB", "CouchDB", "DynamoDB", "InfluxDB",
+                    // Облачные технологии
+                    "AWS", "Azure", "GCP", "Docker", "Kubernetes", "Terraform", "Jenkins", "GitLab", "GitHub", "Bitbucket", "Heroku", "Vercel", "Netlify", "Cloudflare", "CDN", "S3", "Lambda", "EC2", "RDS",
+                    // Методологии и процессы
+                    "Agile", "Scrum", "DevOps", "CI/CD", "TDD", "BDD", "Microservices", "REST", "GraphQL", "OAuth", "JWT", "OOP", "SOLID", "DRY", "KISS", "YAGNI", "MVP", "CRUD", "MVC", "MVP",
+                    // Инструменты разработки
+                    "Git", "VS Code", "IntelliJ", "Eclipse", "Sublime", "Atom", "Vim", "Emacs", "Postman", "Insomnia", "Figma", "Sketch", "Photoshop", "Illustrator", "Zeplin", "InVision", "Framer", "Principle",
+                    // Операционные системы
+                    "Linux", "Windows", "macOS", "Ubuntu", "CentOS", "Debian", "Fedora", "Arch", "FreeBSD", "OpenBSD", "Android", "iOS", "ChromeOS", "Solaris", "AIX", "HP-UX",
+                    // Сетевые технологии
+                    "Ethernet", "WiFi", "Bluetooth", "NFC", "VPN", "Proxy", "Firewall", "Router", "Switch", "Gateway", "Load Balancer", "Reverse Proxy", "SSL/TLS", "HTTPS", "FTP", "SSH", "Telnet", "SMTP", "POP3", "IMAP",
+                    // Искусственный интеллект
+                    "Machine Learning", "Deep Learning", "Neural Network", "TensorFlow", "PyTorch", "Keras", "Scikit-learn", "Pandas", "NumPy", "Matplotlib", "Seaborn", "Jupyter", "OpenCV", "NLTK", "spaCy", "BERT", "GPT", "YOLO", "ResNet", "LSTM"
+                ];
+                
+                fallingWord.word = sideWords[Math.floor(Math.random() * sideWords.length)];
+                fallingWord.y = -100; // Начинаем выше экрана
+                fallingWord.speed = Math.random() * 2.5 + 0.3;
+                fallingWord.opacity = Math.random() * 0.6 + 0.1;
+                
+                if (fallingWord.side === 'left') {
+                    fallingWord.x = Math.random() * 200; // Расширенный диапазон
+                } else {
+                    fallingWord.x = window.innerWidth - 200 + Math.random() * 200; // Расширенный диапазон
+                }
             }
         }
     }
@@ -72,13 +174,52 @@ class MenuEffects {
         
         this.particlesCtx.clearRect(0, 0, this.particlesCanvas.width, this.particlesCanvas.height);
         
+        // Рисуем падающие слова
+        this.particlesCtx.font = '14px "Share Tech Mono"';
+        this.particlesCtx.textBaseline = 'top';
+        
+        for (const fallingWord of this.fallingWords) {
+            this.particlesCtx.save();
+            this.particlesCtx.globalAlpha = fallingWord.opacity;
+            this.particlesCtx.fillStyle = '#4a7c59'; // Темно-зеленый цвет для падающих слов
+            this.particlesCtx.fillText(fallingWord.word, fallingWord.x, fallingWord.y);
+            this.particlesCtx.restore();
+        }
+        
+        // Рисуем частицы
         for (const particle of this.particles) {
             this.particlesCtx.save();
             this.particlesCtx.globalAlpha = particle.life;
             this.particlesCtx.fillStyle = particle.color;
+            this.particlesCtx.translate(particle.x, particle.y);
+            this.particlesCtx.rotate(particle.rotation);
+            
+            // Рисуем частицу как звезду для более интересного эффекта
             this.particlesCtx.beginPath();
-            this.particlesCtx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+            const spikes = 5;
+            const outerRadius = particle.size;
+            const innerRadius = particle.size * 0.4;
+            
+            for (let i = 0; i < spikes * 2; i++) {
+                const angle = (i * Math.PI) / spikes;
+                const radius = i % 2 === 0 ? outerRadius : innerRadius;
+                const x = Math.cos(angle) * radius;
+                const y = Math.sin(angle) * radius;
+                
+                if (i === 0) {
+                    this.particlesCtx.moveTo(x, y);
+                } else {
+                    this.particlesCtx.lineTo(x, y);
+                }
+            }
+            this.particlesCtx.closePath();
             this.particlesCtx.fill();
+            
+            // Добавляем свечение
+            this.particlesCtx.shadowColor = particle.color;
+            this.particlesCtx.shadowBlur = 10;
+            this.particlesCtx.fill();
+            
             this.particlesCtx.restore();
         }
     }
@@ -298,31 +439,28 @@ class GameAnimations {
     startGameSequence() {
         this.hideAllElements();
         
+        // Сразу показываем вопрос
+        this.animateQuestion();
+        
         // Анимация HUD элементов
         setTimeout(() => {
             this.animateHUD();
         }, 500);
         
-        // Анимация вопроса
-        setTimeout(() => {
-            this.animateQuestion();
-        }, 2000);
-        
         // Анимация игрового поля
         setTimeout(() => {
             this.animateGameCanvas();
-        }, 3500);
+        }, 2000);
         
         // Анимация инструкции
         setTimeout(() => {
             this.animateDropbar();
-        }, 5000);
+        }, 4000);
     }
 
     hideAllElements() {
-        // Скрываем только текстовые элементы, НЕ HUD!
+        // Скрываем только dropbar, НЕ вопрос!
         const textElements = [
-            this.elements.questionDisplay,
             this.elements.dropbarDisplay
         ];
         
@@ -337,6 +475,7 @@ class GameAnimations {
         });
         
         // HUD элементы НЕ скрываем!
+        // Вопрос тоже НЕ скрываем - он должен быть виден сразу!
         
         // Игровое поле начинаем с очень пиксельного эффекта, но сохраняем размеры
         if (this.elements.gameCanvas) {
@@ -375,16 +514,13 @@ class GameAnimations {
     animateQuestion() {
         if (!this.elements.questionDisplay) return;
         
+        // Просто показываем вопрос без анимации печатания
         this.elements.questionDisplay.style.opacity = '1';
-        this.elements.questionDisplay.classList.add('typing');
-        
-        setTimeout(() => {
-            this.elements.questionDisplay.classList.remove('typing');
-            this.elements.questionDisplay.style.borderRight = 'none';
-            this.elements.questionDisplay.style.width = 'auto';
-            this.elements.questionDisplay.style.overflow = 'visible';
-            this.elements.questionDisplay.style.whiteSpace = 'normal';
-        }, 4000); // Увеличиваем время для длинного текста
+        this.elements.questionDisplay.style.transform = 'translateY(0)';
+        this.elements.questionDisplay.style.width = 'auto';
+        this.elements.questionDisplay.style.overflow = 'visible';
+        this.elements.questionDisplay.style.whiteSpace = 'normal';
+        this.elements.questionDisplay.style.borderRight = 'none';
     }
 
     animateGameCanvas() {
@@ -396,29 +532,29 @@ class GameAnimations {
         // Этап 1: Очень пиксельный эффект (8-bit)
         this.elements.gameCanvas.style.opacity = '0.7';
         this.elements.gameCanvas.style.filter = 'blur(4px) contrast(150%) brightness(0.6) saturate(0.3)';
-        this.elements.gameCanvas.style.transform = 'scale(0.9)';
+        this.elements.gameCanvas.style.transform = 'scale(0.9) rotateY(8deg)';
         this.elements.gameCanvas.classList.add('pixelated');
         
         // Этап 2: Переход к менее пиксельному
         setTimeout(() => {
             this.elements.gameCanvas.style.filter = 'blur(2px) contrast(120%) brightness(0.8) saturate(0.6)';
-            this.elements.gameCanvas.style.transform = 'scale(0.95)';
-        }, 600);
+            this.elements.gameCanvas.style.transform = 'scale(0.95) rotateY(4deg)';
+        }, 800);
         
         // Этап 3: Почти нормальное качество
         setTimeout(() => {
             this.elements.gameCanvas.style.filter = 'blur(1px) contrast(110%) brightness(0.9) saturate(0.8)';
-            this.elements.gameCanvas.style.transform = 'scale(0.98)';
-        }, 1200);
+            this.elements.gameCanvas.style.transform = 'scale(0.98) rotateY(2deg)';
+        }, 1600);
         
         // Этап 4: Полное качество
         setTimeout(() => {
             this.elements.gameCanvas.style.filter = 'none';
             this.elements.gameCanvas.style.opacity = '1';
-            this.elements.gameCanvas.style.transform = 'scale(1)';
+            this.elements.gameCanvas.style.transform = 'scale(1) rotateY(0deg)';
             this.elements.gameCanvas.classList.remove('pixelated');
             this.elements.gameCanvas.classList.add('normal');
-        }, 1800);
+        }, 2400);
     }
 
     animateDropbar() {
